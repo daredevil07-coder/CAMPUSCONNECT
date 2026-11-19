@@ -36,3 +36,4 @@ except Exception as _import_err:
         )
 
     handler = _error_app
+    app = _error_app
