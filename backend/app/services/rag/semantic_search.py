@@ -1,7 +1,6 @@
 import math
 import logging
 from typing import List, Dict, Any, Optional
-import numpy as np
 
 from app.services.rag.hf_embedding_service import HuggingFaceEmbeddingService
 
@@ -44,10 +43,9 @@ SEMANTIC_CLUSTERS = {
 }
 
 
-def create_dense_semantic_vector(text: str) -> np.ndarray:
+def create_dense_semantic_vector(text: str) -> List[float]:
     """
-    Creates a dense semantic representation by projecting text across domain semantic clusters,
-    subword n-grams, and length features.
+    Creates a dense semantic representation using pure-Python lists and arithmetic.
     """
     text_lower = text.lower()
     vector = []
@@ -70,17 +68,16 @@ def create_dense_semantic_vector(text: str) -> np.ndarray:
             char_features[idx] += 1.0
 
     vector.extend(char_features)
-    vec_arr = np.array(vector, dtype=float)
-    norm = np.linalg.norm(vec_arr)
+    norm = math.sqrt(sum(x * x for x in vector))
     if norm > 0:
-        vec_arr = vec_arr / norm
-    return vec_arr
+        vector = [x / norm for x in vector]
+    return vector
 
 
 class SemanticSearchEngine:
     def __init__(self):
-        self.doc_vectors: Dict[str, np.ndarray] = {}
-        self.hf_doc_vectors: Dict[str, np.ndarray] = {}
+        self.doc_vectors: Dict[str, List[float]] = {}
+        self.hf_doc_vectors: Dict[str, Any] = {}
 
     def index_documents(self, docs: List[Dict[str, Any]]) -> None:
         """Precompute and store dense semantic vectors for approved knowledge records."""
@@ -100,25 +97,9 @@ class SemanticSearchEngine:
 
     def search(self, query: str) -> Dict[str, float]:
         """Compute cosine similarity of query against all indexed documents."""
-        # 1. Try Serverless Hugging Face 384-d dense embeddings if available
-        if self.hf_doc_vectors:
-            hf_q_vec = HuggingFaceEmbeddingService.generate_embeddings(query)
-            if hf_q_vec is not None and isinstance(hf_q_vec, np.ndarray):
-                q_norm = np.linalg.norm(hf_q_vec)
-                if q_norm > 0:
-                    results = {}
-                    for doc_id, d_vec in self.hf_doc_vectors.items():
-                        d_norm = np.linalg.norm(d_vec)
-                        if d_norm == 0:
-                            results[doc_id] = 0.0
-                        else:
-                            cos_sim = float(np.dot(hf_q_vec, d_vec) / (q_norm * d_norm))
-                            results[doc_id] = max(0.0, min(1.0, cos_sim))
-                    return results
-
-        # 2. Resilient local semantic cluster vector projection
+        # Resilient local semantic cluster vector projection
         q_vec = create_dense_semantic_vector(query)
-        q_norm = np.linalg.norm(q_vec)
+        q_norm = math.sqrt(sum(x * x for x in q_vec))
         if q_norm == 0:
             return {}
 
@@ -127,15 +108,15 @@ class SemanticSearchEngine:
 
         results = {}
         for doc_id, d_vec in self.doc_vectors.items():
-            d_norm = np.linalg.norm(d_vec)
+            d_norm = math.sqrt(sum(x * x for x in d_vec))
             if d_norm == 0:
                 results[doc_id] = 0.0
                 continue
-            cos_sim = float(np.dot(q_vec, d_vec) / (q_norm * d_norm))
+            dot = sum(a * b for a, b in zip(q_vec, d_vec))
+            cos_sim = dot / (q_norm * d_norm)
             if not has_domain_terms:
                 cos_sim *= 0.35
             # Bound within 0.0 and 1.0
-            results[doc_id] = max(0.0, min(1.0, cos_sim))
+            results[doc_id] = max(0.0, min(1.0, float(cos_sim)))
 
         return results
-
