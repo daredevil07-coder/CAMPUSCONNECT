@@ -1,7 +1,7 @@
 import os
 import logging
+import math
 from typing import List, Optional, Union
-import numpy as np
 
 from app.core.config import settings
 
@@ -59,10 +59,10 @@ class HuggingFaceEmbeddingService:
         cls,
         texts: Union[str, List[str]],
         model: Optional[str] = None
-    ) -> Optional[np.ndarray]:
+    ) -> Optional[List]:
         """
         Generates 384-d dense embeddings for text or list of texts.
-        Returns numpy array of shape (N, 384) or (384,) normalized to unit norm.
+        Returns list of lists (pure Python, no numpy).
         """
         input_list = [texts] if isinstance(texts, str) else texts
         if not input_list:
@@ -79,22 +79,37 @@ class HuggingFaceEmbeddingService:
                 input_list,
                 model=target_model,
             )
-            arr = np.array(raw_embeddings, dtype=np.float32)
 
-            # Ensure 2D shape (N, dimension)
-            if arr.ndim == 1:
-                arr = np.expand_dims(arr, axis=0)
-            elif arr.ndim == 3:
-                # If model returns token-level embeddings (N, tokens, dim), average pool across tokens
-                arr = np.mean(arr, axis=1)
+            def to_list_2d(data):
+                """Convert nested structure to list of float lists (2D)."""
+                if not data:
+                    return []
+                # Already list of lists
+                if isinstance(data[0], (list, tuple)):
+                    # Check if 3D (token-level): average pool
+                    if data[0] and isinstance(data[0][0], (list, tuple)):
+                        result = []
+                        for row in data:
+                            n = len(row[0])
+                            pooled = [sum(row[t][d] for t in range(len(row))) / len(row) for d in range(n)]
+                            result.append(pooled)
+                        return result
+                    return [list(row) for row in data]
+                # 1D single embedding
+                return [list(data)]
 
-            # Normalize rows to unit length for cosine similarity
-            norms = np.linalg.norm(arr, axis=1, keepdims=True)
-            norms[norms == 0] = 1.0
-            norm_arr = arr / norms
+            arr = to_list_2d(raw_embeddings)
+
+            def normalize_row(row):
+                norm = math.sqrt(sum(x * x for x in row))
+                if norm == 0:
+                    return row
+                return [x / norm for x in row]
+
+            norm_arr = [normalize_row(row) for row in arr]
 
             if isinstance(texts, str):
-                return norm_arr[0]
+                return norm_arr[0] if norm_arr else None
             return norm_arr
 
         except Exception as e:
