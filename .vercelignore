@@ -1,0 +1,31 @@
+# Ignore local databases and backups
+*.db
+*.sqlite
+data_backup/
+campusconnect.db
+backend/campusconnect.db
+
+# Ignore datasets and heavy reports
+Naukri Dataset with Salary column/
+conflicting_records.csv
+data_merge_report.csv
+data_quality_results.csv
+duplicate_records.csv
+retrieval_test_results.csv
+source_validation_report.csv
+SOURCE_PROVENANCE_REPORT.csv
+
+# Ignore test files & scratch scripts
+scratch/
+backend/tests/
+backend/.pytest_cache/
+.pytest_cache/
+E2E_30_SUITE_RESULTS.json
+RAG_EVALUATION_DATASET.jsonl
+
+# Ignore virtual environments
+.venv/
+backend/.venv/
+__pycache__/
+backend/**/__pycache__/
+api/**/__pycache__/
