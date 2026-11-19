@@ -42,6 +42,11 @@ else:
     engine_kwargs["pool_recycle"] = 300
     engine_kwargs["pool_size"] = 5
     engine_kwargs["max_overflow"] = 10
+    engine_kwargs["connect_args"] = {
+        "statement_cache_size": 0,
+        "timeout": 10.0,
+        "command_timeout": 10.0,
+    }
 
 engine = create_async_engine(async_db_url, **engine_kwargs)
 
