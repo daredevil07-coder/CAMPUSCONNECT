@@ -18,16 +18,8 @@ logger = logging.getLogger("campusconnect")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup and shutdown lifecycle."""
-    logger.info("Initializing CampusConnect application...")
-    try:
-        # Seed database if not seeded and pre-warm index
-        async with AsyncSessionLocal() as session:
-            await seed_database(session)
-            await hybrid_search_engine.build_index(session)
-        logger.info("CampusConnect ready to serve LPU campus requests.")
-    except Exception as e:
-        logger.warning(f"Lifespan initialization notice (non-fatal for serverless cold start): {e}")
+    """Startup and shutdown lifecycle (lightweight for serverless execution)."""
+    logger.info("CampusConnect serverless instance ready.")
     yield
     logger.info("CampusConnect shutting down.")
 
